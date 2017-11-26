@@ -110,7 +110,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
 		const std::vector<LandmarkObs> &observations, const Map &map_landmarks) {
-	// TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
+	// Update the weights of each particle using a mult-variate Gaussian distribution. You can read
 	//   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
 	// NOTE: The observations are given in the VEHICLE'S coordinate system. Your particles are located
 	//   according to the MAP'S coordinate system. You will need to transform between the two systems.
@@ -161,7 +161,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		double exponent = 0;
 		particles[i].weight = 1;
 		for (int j = 0; j < particles[i].associations.size(); ++j) {
-			exponent = /* TODO: Finish this */0;
+			double x_obs = particles[i].sense_x[j];
+			double y_obs = particles[i].sense_y[j];
+			double mu_x = map_landmarks.landmark_list[particles[i].associations[j]].x_f;
+			double mu_y = map_landmarks.landmark_list[particles[i].associations[j]].y_f;
+			exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
 			particles[i].weight *= gauss_norm * exp(-exponent);
 		}
 	}
