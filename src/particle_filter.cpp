@@ -93,7 +93,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
-	
+
 	double curr_dist = 0;
 	double closest_dist = 0;
 
@@ -120,7 +120,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
-	
+
 	for (int i = 0; i < num_particles; ++i) {
 		// Predict sensor measurements for each particle within sensor range
 		vector<LandmarkObs> predicted_locations;
@@ -146,25 +146,16 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		// Find associations between observations and map landmarks
 		dataAssociation(predicted_locations, transformed_observations);
-		vector<int> associations;
-		vector<double> sense_x;
-		vector<double> sense_y;
-		for (int j = 0; j < transformed_observations.size(); ++j) {
-			associations.push_back(transformed_observations[j].id);
-			sense_x.push_back(transformed_observations[j].x);
-			sense_y.push_back(transformed_observations[j].y);
-		}
-		SetAssociations(particles[i], associations, sense_x, sense_y);
 
 		// Update weight based on associations
 		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
-		double exponent = 0;
+		double exponent;
 		particles[i].weight = 1;
-		for (int j = 0; j < particles[i].associations.size(); ++j) {
-			double x_obs = particles[i].sense_x[j];
-			double y_obs = particles[i].sense_y[j];
-			double mu_x = map_landmarks.landmark_list[particles[i].associations[j]].x_f;
-			double mu_y = map_landmarks.landmark_list[particles[i].associations[j]].y_f;
+		for (int j = 0; j < transformed_observations.size(); ++j) {
+			double x_obs = transformed_observations[j].x;
+			double y_obs = transformed_observations[j].y;
+			double mu_x = map_landmarks.landmark_list[transformed_observations[j].id].x_f;
+			double mu_y = map_landmarks.landmark_list[transformed_observations[j].id].y_f;
 			exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
 			particles[i].weight *= gauss_norm * exp(-exponent);
 		}
@@ -175,7 +166,23 @@ void ParticleFilter::resample() {
 	// TODO: Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+	// Create vector of particle weights
+	vector<double> particle_weights;
+	for (int i = 0; i < num_particles; ++i) {
+		particle_weights.push_back(particles[i].weight);
+	}
 
+	// Create sampler
+	random_device rd;
+	mt19937 gen(rd());
+	discrete_distribution<> d(particle_weights.begin(), particle_weights.end());
+
+	// Resample particles
+	vector<Particle> resampled_particles;
+	for (int i = 0; i < num_particles; ++i) {
+		resampled_particles.push_back(particles[d(gen)]);
+	}
+	particles = resampled_particles;
 }
 
 Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations, 
