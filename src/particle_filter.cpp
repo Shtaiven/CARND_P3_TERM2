@@ -60,6 +60,32 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+	// Generate random distributions
+	random_device rd;
+	mt19937 gen(rd());
+	normal_distribution<double> nd_x(0.0, std_pos[0]);
+	normal_distribution<double> nd_y(0.0, std_pos[1]);
+	normal_distribution<double> nd_theta(0.0, std_pos[2]);
+
+	double travel_scale = velocity / yaw_rate; // scaling factor for distance
+	double travel_dist = 0; // either yaw dist or forward dist
+
+	// Predict new particle locations
+	for (int i = 0; i < num_particles; ++i) {
+		
+		if (yaw_rate != 0.0) {
+			travel_dist = yaw_rate * delta_t;
+			particles[i].x += travel_scale * (sin(particles[i].theta + travel_dist) - sin(particles[i].theta)) + nd_x(gen);
+			particles[i].y += travel_scale * (cos(particles[i].theta) - cos(particles[i].theta + travel_dist)) + nd_y(gen);
+			particles[i].theta += travel_dist + nd_theta(gen);
+		} else {
+			travel_dist = velocity * delta_t;
+			particles[i].x += travel_dist * cos(particles[i].theta) + nd_x(gen);
+			particles[i].y += travel_dist * sin(particles[i].theta) + nd_y(gen);
+			particles[i].theta += nd_theta(gen);
+		}
+		particles[i].theta = fmod(particles[i].theta, 2 * M_PI);
+	}
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
