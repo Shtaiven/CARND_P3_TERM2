@@ -99,7 +99,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 
 	for (int i = 0; i < observations.size(); ++i) {
 		for (int j = 0; j < predicted.size(); ++j) {
-			curr_dist = abs(sqrt(pow(predicted[j].x, 2) + pow(predicted[j].y, 2)) - sqrt(pow(observations[i].x, 2) + pow(observations[i].y, 2)));
+			curr_dist = abs(dist(predicted[j].x, predicted[j].y, observations[i].x, observations[i].y));
 			if (curr_dist < closest_dist) {
 				observations[i].id = predicted[j].id;
 				closest_dist = curr_dist;
@@ -120,6 +120,51 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+	
+	for (int i = 0; i < num_particles; ++i) {
+		// Predict sensor measurements for each particle within sensor range
+		vector<LandmarkObs> predicted_locations;
+		for (int j = 0; j < map_landmarks.landmark_list.size(); ++j) {
+			if (abs(dist(map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f,
+			  particles[i].x, particles[i].y)) <= sensor_range) {
+				LandmarkObs l;
+				l.id = map_landmarks.landmark_list[j].id_i;
+				l.x = map_landmarks.landmark_list[j].x_f;
+				l.y = map_landmarks.landmark_list[j].y_f;
+				predicted_locations.push_back(l);
+			}
+		}
+
+		// Transform sensor measurements to MAP coordinate system
+		vector<LandmarkObs> transformed_observations;
+		for (int j = 0; j < observations.size(); ++j) {
+			LandmarkObs l;
+			l.x = particles[i].x + cos(particles[i].theta) * observations[j].x - sin(particles[i].theta) * observations[j].y;
+			l.y = particles[i].y + sin(particles[i].theta) * observations[j].y + cos(particles[i].theta) * observations[j].x;
+			transformed_observations.push_back(l);
+		}
+
+		// Find associations between observations and map landmarks
+		dataAssociation(predicted_locations, transformed_observations);
+		vector<int> associations;
+		vector<double> sense_x;
+		vector<double> sense_y;
+		for (int j = 0; j < transformed_observations.size(); ++j) {
+			associations.push_back(transformed_observations[j].id);
+			sense_x.push_back(transformed_observations[j].x);
+			sense_y.push_back(transformed_observations[j].y);
+		}
+		SetAssociations(particles[i], associations, sense_x, sense_y);
+
+		// Update weight based on associations
+		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
+		double exponent = 0;
+		particles[i].weight = 1;
+		for (int j = 0; j < particles[i].associations.size(); ++j) {
+			exponent = /* TODO: Finish this */0;
+			particles[i].weight *= gauss_norm * exp(-exponent);
+		}
+	}
 }
 
 void ParticleFilter::resample() {
