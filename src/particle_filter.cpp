@@ -19,14 +19,24 @@
 
 using namespace std;
 
+#define DEBUG_OUTPUT  // Comment out to remove debug output
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Set the number of particles. Initialize all particles to first position (based on estimates of 
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
+	#ifdef DEBUG_OUTPUT
+	cout << "~~~~~~~~~~ init ~~~~~~~~~~" << endl;
+	#endif
+
 	// Set number of particles
-	num_particles = 1000;
+	num_particles = 10;
+
+	#ifdef DEBUG_OUTPUT
+	cout << "Num particles: " << num_particles << endl;
+	#endif
 
 	// Generate random distributions
 	random_device rd;
@@ -52,6 +62,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	// Finish initializing
 	is_initialized = true;
+
+	#ifdef DEBUG_OUTPUT
+	cout << "Particles initialized" << endl;
+	#endif
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -60,6 +74,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+	#ifdef DEBUG_OUTPUT
+	cout << "~~~~~~~~~~ prediction ~~~~~~~~~~" << endl;
+	#endif
+
 	// Generate random distributions
 	random_device rd;
 	mt19937 gen(rd());
@@ -67,12 +85,18 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	normal_distribution<double> nd_y(0.0, std_pos[1]);
 	normal_distribution<double> nd_theta(0.0, std_pos[2]);
 
-	double travel_scale = velocity / yaw_rate; // scaling factor for distance
-	double travel_dist = 0; // either yaw dist or forward dist
+	double travel_scale = 1.0;
+	if (yaw_rate != 0.0) {
+		travel_scale = velocity / yaw_rate; // scaling factor for distance
+	}
 
 	// Predict new particle locations
 	for (int i = 0; i < num_particles; ++i) {
-		
+		#ifdef DEBUG_OUTPUT
+		printf("Particle %d: (%f, %f, %f)->", particles[i].id, particles[i].x, particles[i].y, particles[i].theta);
+		#endif
+
+		double travel_dist = 0; // either yaw dist or forward dist
 		if (yaw_rate != 0.0) {
 			travel_dist = yaw_rate * delta_t;
 			particles[i].x += travel_scale * (sin(particles[i].theta + travel_dist) - sin(particles[i].theta)) + nd_x(gen);
@@ -85,6 +109,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 			particles[i].theta += nd_theta(gen);
 		}
 		particles[i].theta = fmod(particles[i].theta, 2 * M_PI);
+
+		#ifdef DEBUG_OUTPUT
+		printf("(%f, %f, %f)\n", particles[i].x, particles[i].y, particles[i].theta);
+		#endif
 	}
 }
 
@@ -120,7 +148,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
-	double max_weight = -1;
+	#ifdef DEBUG_OUTPUT
+	cout << "~~~~~~~~~~ updateWeights ~~~~~~~~~~" << endl;
+	#endif
 
 	for (int i = 0; i < num_particles; ++i) {
 		// Predict sensor measurements for each particle within sensor range
@@ -148,28 +178,26 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		// Find associations between observations and map landmarks
 		dataAssociation(predicted_locations, transformed_observations);
+		particles[i].associations.clear();
+		particles[i].sense_x.clear();
+		particles[i].sense_y.clear();
+		for (int j = 0; j > transformed_observations.size(); ++j) {
+			particles[i].associations.push_back(transformed_observations[j].id);
+			particles[i].sense_x.push_back(transformed_observations[j].x);
+			particles[i].sense_y.push_back(transformed_observations[j].y);
+		}
 
-		// Update weight based on associations FIXME: All weights computed to be 0
+		// Update weight based on associations
+		// FIXME: All weights computed to be 0
 		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
-		double exponent;
 		particles[i].weight = 1;
 		for (int j = 0; j < transformed_observations.size(); ++j) {
 			double x_obs = transformed_observations[j].x;
 			double y_obs = transformed_observations[j].y;
 			double mu_x = map_landmarks.landmark_list[transformed_observations[j].id-1].x_f;
 			double mu_y = map_landmarks.landmark_list[transformed_observations[j].id-1].y_f;
-			exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
-			particles[i].weight *= gauss_norm * exp(-exponent);
-		}
-		if (particles[i].weight > max_weight) {
-			max_weight = particles[i].weight;
-		}
-	}
-
-	// Normalize weights
-	for (int i = 0; i < num_particles; ++i) {
-		if (max_weight != 0) {
-			particles[i].weight /= max_weight;
+			double exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
+			particles[i].weight *= gauss_norm * exp(-exponent);  // Some of the particle weights come out as 0
 		}
 	}
 }
@@ -179,22 +207,33 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 	// Create vector of particle weights
-	vector<double> particle_weights;
+
+	#ifdef DEBUG_OUTPUT
+	cout << "~~~~~~~~~~ resample ~~~~~~~~~~" << endl;
+	#endif
+
+	weights.clear();
 	for (int i = 0; i < num_particles; ++i) {
-		particle_weights.push_back(particles[i].weight);
+		weights.push_back(particles[i].weight);
 	}
 
 	// Create sampler
 	random_device rd;
 	mt19937 gen(rd());
-	discrete_distribution<> d(particle_weights.begin(), particle_weights.end());
+	discrete_distribution<> d(weights.begin(), weights.end());
 
 	// Resample particles
 	vector<Particle> resampled_particles;
 	for (int i = 0; i < num_particles; ++i) {
-		resampled_particles.push_back(particles[d(gen)]);
+		Particle p = particles[d(gen)];
+		p.id = i + 1;
+		resampled_particles.push_back(p);
 	}
 	particles = resampled_particles;
+
+	#ifdef DEBUG_OUTPUT
+	cout << "Finished resampling" << endl;
+	#endif
 }
 
 Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations, 
