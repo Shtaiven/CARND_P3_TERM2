@@ -36,6 +36,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	#ifdef DEBUG_OUTPUT
 	cout << "Num particles: " << num_particles << endl;
+	printf("Particle init: (%f, %f, %f)\n", x, y, theta);
 	#endif
 
 	// Generate random distributions
@@ -52,12 +53,16 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Init particles
 	for (int i=0 ; i < num_particles; ++i) {
 		Particle p;
-		p.id = i;
+		p.id = i + 1;
 		p.x = x + nd_x(gen);
 		p.y = y + nd_y(gen);
 		p.theta = theta + nd_theta(gen);
 		p.weight = weights[i];
 		particles.push_back(p);
+
+		#ifdef DEBUG_OUTPUT
+		printf("Particle %4d: (%f, %f, %f)\n", particles[i].id, particles[i].x, particles[i].y, particles[i].theta);
+		#endif
 	}
 
 	// Finish initializing
@@ -93,7 +98,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// Predict new particle locations
 	for (int i = 0; i < num_particles; ++i) {
 		#ifdef DEBUG_OUTPUT
-		printf("Particle %d: (%f, %f, %f)->", particles[i].id, particles[i].x, particles[i].y, particles[i].theta);
+		printf("Particle %4d: (%f, %f, %f)->", particles[i].id, particles[i].x, particles[i].y, particles[i].theta);
 		#endif
 
 		double travel_dist = 0; // either yaw dist or forward dist
@@ -114,6 +119,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		printf("(%f, %f, %f)\n", particles[i].x, particles[i].y, particles[i].theta);
 		#endif
 	}
+
+	#ifdef DEBUG_OUTPUT
+	cout << "Particles predicted" << endl;
+	#endif
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
@@ -200,9 +209,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			particles[i].weight *= gauss_norm * exp(-exponent);  // Some of the particle weights come out as 0
 		}
 	}
+
+	#ifdef DEBUG_OUTPUT
+	cout << "Weights updated" <<endl;
+	#endif
 }
 
-void ParticleFilter::resample() {
+void ParticleFilter::resample() {  // FIXME: All of these particles are resamples to the same one
 	// Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
@@ -228,11 +241,15 @@ void ParticleFilter::resample() {
 		Particle p = particles[d(gen)];
 		p.id = i + 1;
 		resampled_particles.push_back(p);
+
+		#ifdef DEBUG_OUTPUT
+		printf("Particle %4d: (%f, %f, %f, %f)->(%f, %f, %f)\n", particles[i].id, particles[i].x, particles[i].y, particles[i].theta, weights[i], p.x, p.y, p.theta);
+		#endif
 	}
-	particles = resampled_particles;
+	particles.swap(resampled_particles);
 
 	#ifdef DEBUG_OUTPUT
-	cout << "Finished resampling" << endl;
+	cout << "Particles resampled" << endl;
 	#endif
 }
 
