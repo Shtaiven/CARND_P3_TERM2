@@ -199,7 +199,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		#ifdef DEBUG_OUTPUT
 		printf("Particle %4d:\n", particles[i].id);
 		double prev_weight_debug = particles[i].weight;
-		printf("\t%20s  %20s %9s\n", "Trans. Observation", "Map Landmark", "Exponent");
+		printf("\t%20s,%21s,%9s\n", "Trans. Observation", "Map Landmark", "Exponent");
 		#endif
 		// Update weight based on associations
 		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
