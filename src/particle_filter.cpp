@@ -163,7 +163,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 	for (int i = 0; i < num_particles; ++i) {
 		// Predict sensor measurements for each particle within sensor range
-		vector<LandmarkObs> predicted_locations;
+		vector<LandmarkObs> predicted_locations;  // TODO: Check that these are predicted correctly
 		for (int j = 0; j < map_landmarks.landmark_list.size(); ++j) {
 			if (abs(dist(map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f,
 			  particles[i].x, particles[i].y)) <= sensor_range) {
@@ -176,7 +176,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		// Transform sensor measurements to MAP coordinate system
-		vector<LandmarkObs> transformed_observations;
+		vector<LandmarkObs> transformed_observations;  // TODO: Check that these are computed correctly
 		for (int j = 0; j < observations.size(); ++j) {
 			LandmarkObs l;
 			l.id = 0;
@@ -186,7 +186,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		// Find associations between observations and map landmarks
-		dataAssociation(predicted_locations, transformed_observations);
+		dataAssociation(predicted_locations, transformed_observations);  // TODO: Check that these are associated correctly
 		particles[i].associations.clear();
 		particles[i].sense_x.clear();
 		particles[i].sense_y.clear();
@@ -196,8 +196,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			particles[i].sense_y.push_back(transformed_observations[j].y);
 		}
 
+		#ifdef DEBUG_OUTPUT
+		printf("Particle %4d: Weight %8.3f->", particles[i].id, particles[i].weight);
+		#endif
 		// Update weight based on associations
-		// FIXME: All weights computed to be 0
 		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
 		particles[i].weight = 1;
 		for (int j = 0; j < transformed_observations.size(); ++j) {
@@ -206,8 +208,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			double mu_x = map_landmarks.landmark_list[transformed_observations[j].id-1].x_f;
 			double mu_y = map_landmarks.landmark_list[transformed_observations[j].id-1].y_f;
 			double exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
-			particles[i].weight *= gauss_norm * exp(-exponent);  // Some of the particle weights come out as 0
+			particles[i].weight *= gauss_norm * exp(-exponent);  // FIXME: exp(-exponent) always evaluates to 0. Is distance between obs and landmark too high?
 		}
+		#ifdef DEBUG_OUTPUT
+		printf("%8.3f\n", particles[i].weight);
+		#endif
 	}
 
 	#ifdef DEBUG_OUTPUT
@@ -215,7 +220,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	#endif
 }
 
-void ParticleFilter::resample() {  // FIXME: All of these particles are resamples to the same one
+void ParticleFilter::resample() {
 	// Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
