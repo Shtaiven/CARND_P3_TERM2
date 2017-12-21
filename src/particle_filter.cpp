@@ -197,7 +197,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		#ifdef DEBUG_OUTPUT
-		printf("Particle %4d: Weight %8.3f->", particles[i].id, particles[i].weight);
+		printf("Particle %4d:\n", particles[i].id);
+		double prev_weight_debug = particles[i].weight;
+		printf("\t%20s  %20s %9s\n", "Trans. Observation", "Map Landmark", "Exponent");
 		#endif
 		// Update weight based on associations
 		double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
@@ -208,10 +210,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			double mu_x = map_landmarks.landmark_list[transformed_observations[j].id-1].x_f;
 			double mu_y = map_landmarks.landmark_list[transformed_observations[j].id-1].y_f;
 			double exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
+			#ifdef DEBUG_OUTPUT
+			printf("\t(%8.3f, %8.3f), (%8.3f, %8.3f), %8.3f\n", x_obs, y_obs, mu_x, mu_y, exponent);
+			#endif
 			particles[i].weight *= gauss_norm * exp(-exponent);  // FIXME: exp(-exponent) always evaluates to 0. Is distance between obs and landmark too high?
 		}
 		#ifdef DEBUG_OUTPUT
-		printf("%8.3f\n", particles[i].weight);
+		printf("\tWeight %.3f->%.3f\n", prev_weight_debug, particles[i].weight);
 		#endif
 	}
 
