@@ -19,7 +19,7 @@
 
 using namespace std;
 
-#define DEBUG_OUTPUT  // Comment out to remove debug output
+//#define DEBUG_OUTPUT  // Comment out to remove debug output
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -36,7 +36,11 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	#endif
 
 	// Set number of particles
+	#ifdef DEBUG_OUTPUT
 	num_particles = 10;
+	#else
+	num_particles = 1000;
+	#endif
 
 	#ifdef DEBUG_OUTPUT
 	cout << "Num particles: " << num_particles << endl;
@@ -106,18 +110,18 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		#endif
 
 		double travel_dist = 0; // either yaw dist or forward dist
-		if (yaw_rate < 1e-10) {
-			travel_dist = velocity * delta_t;
+		if (abs(yaw_rate) <= 1e-12) {
+			travel_dist = velocity * delta_t;  // distance
 			particles[i].x += travel_dist * cos(particles[i].theta) + nd_x(gen);
 			particles[i].y += travel_dist * sin(particles[i].theta) + nd_y(gen);
 			particles[i].theta += nd_theta(gen);
 		} else {
-			travel_dist = yaw_rate * delta_t;
+			travel_dist = yaw_rate * delta_t;  // rotational distance
 			particles[i].x += travel_scale * (sin(particles[i].theta + travel_dist) - sin(particles[i].theta)) + nd_x(gen);
 			particles[i].y += travel_scale * (cos(particles[i].theta) - cos(particles[i].theta + travel_dist)) + nd_y(gen);
 			particles[i].theta += travel_dist + nd_theta(gen);
 		}
-		particles[i].theta = fmod(particles[i].theta, 2 * M_PI);  //TODO: Normalize or not?
+		//particles[i].theta = fmod(particles[i].theta, 2 * M_PI);  //TODO: Normalize or not?
 
 		#ifdef DEBUG_OUTPUT
 		printf("(%f, %f, %f)\n", particles[i].x, particles[i].y, particles[i].theta);
@@ -141,7 +145,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 		for (int j = 0; j < predicted.size(); ++j) {
 			curr_dist = abs(dist(predicted[j].x, predicted[j].y, observations[i].x, observations[i].y));
 			if (curr_dist < closest_dist) {
-				observations[i].id = predicted[j].id;  // TODO: Check if should store j instead of predicted[j].id
+				observations[i].id = predicted[j].id;
 				closest_dist = curr_dist;
 			}
 		}
@@ -180,7 +184,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		// Transform sensor measurements to MAP coordinate system
-		vector<LandmarkObs> transformed_observations;  // TODO: Check that these are computed correctly
+		vector<LandmarkObs> transformed_observations;
 		for (int j = 0; j < observations.size(); ++j) {
 			LandmarkObs l;
 			l.id = observations[j].id;
@@ -190,7 +194,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		}
 
 		// Find associations between observations and map landmarks
-		dataAssociation(predicted_locations, transformed_observations);  // TODO: Check that these are associated correctly
+		dataAssociation(predicted_locations, transformed_observations);
 		particles[i].associations.clear();
 		particles[i].sense_x.clear();
 		particles[i].sense_y.clear();
@@ -211,13 +215,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		for (int j = 0; j < transformed_observations.size(); ++j) {
 			double x_obs = transformed_observations[j].x;
 			double y_obs = transformed_observations[j].y;
-			double mu_x = map_landmarks.landmark_list[transformed_observations[j].id-1].x_f; // TODO: LOOK AT PREDICTED LOCATIONS!
+			double mu_x = map_landmarks.landmark_list[transformed_observations[j].id-1].x_f;
 			double mu_y = map_landmarks.landmark_list[transformed_observations[j].id-1].y_f;
 			double exponent = (pow(x_obs - mu_x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(y_obs - mu_y, 2) / (2 * pow(std_landmark[1], 2)));
 			#ifdef DEBUG_OUTPUT
 			printf("\t(%8.3f, %8.3f), (%8.3f, %8.3f), %8.3f\n", x_obs, y_obs, mu_x, mu_y, exponent);
 			#endif
-			particles[i].weight *= gauss_norm * exp(-exponent);  // FIXME: exp(-exponent) always evaluates to 0. Is distance between obs and landmark too high?
+			particles[i].weight *= gauss_norm * exp(-exponent);
 		}
 		#ifdef DEBUG_OUTPUT
 		printf("\tWeight %.3f->%.3f\n", prev_weight_debug, particles[i].weight);
